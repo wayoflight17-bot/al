@@ -596,9 +596,13 @@
                     </div>
 
                     <div class="w-full md:w-5/12 bg-black/20 backdrop-blur-md border border-white/20 p-6 rounded-3xl shadow-inner">
-                        <div class="flex justify-between items-end mb-3">
+                        <div class="flex justify-between items-end mb-1">
                             <span class="text-xs font-black uppercase tracking-widest text-indigo-100">Total Experience</span>
                             <span class="text-3xl font-black drop-shadow-md" id="dash-xp">0 <span class="text-sm opacity-70">XP</span></span>
+                        </div>
+                        <div id="dash-xp-adj-notice" class="hidden text-right mb-2">
+                            <span id="dash-xp-adj-badge" class="text-[10px] font-black px-2 py-0.5 rounded-full"></span>
+                            <p id="dash-xp-adj-reason" class="text-[10px] text-white/70 font-medium mt-0.5 italic"></p>
                         </div>
                         <div class="w-full bg-black/30 rounded-full h-4 mb-2 overflow-hidden border border-white/10 p-0.5">
                             <div id="dash-progress" class="bg-white h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.8)] relative overflow-hidden" style="width: 0%">
@@ -1160,6 +1164,11 @@
                     ⭐ Best: <span id="pv-best">0 XP</span>
                 </span>
             </div>
+        </div>
+
+        <!-- XP adjustment reason block — visible to all users when admin sets an override -->
+        <div id="pv-xp-adj-block" style="display:none" class="mx-4 mb-3 px-4 py-2.5 rounded-xl text-xs font-medium">
+            <span class="font-black">📋 XP Adjustment Reason: </span><span id="pv-xp-adj-reason"></span>
         </div>
 
         <!-- Divider -->
@@ -3127,7 +3136,13 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                <div class="text-sm tracking-tight font-bold">${u.xp} xp${u.xpOverride && u.xpOverride !== 0 ? ` <span class="text-[9px] font-black ${u.xpOverride > 0 ? 'text-emerald-400' : 'text-rose-400'}" title="${u.xpOverrideReason || 'Admin adjusted'}">(${u.xpOverride > 0 ? '+' : ''}${u.xpOverride})</span>` : ''}</div>
+                                <div class="flex flex-col items-end">
+                                    <div class="text-sm tracking-tight font-bold">${u.xp} xp</div>
+                                    ${u.xpOverride && u.xpOverride !== 0 ? `<div class="flex flex-col items-end gap-0.5 mt-0.5">
+                                        <span class="text-[9px] font-black px-1.5 py-0.5 rounded-full ${u.xpOverride > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${u.xpOverride > 0 ? '+' : ''}${u.xpOverride} adj</span>
+                                        ${u.xpOverrideReason ? `<span class="text-[8px] text-slate-400 font-medium max-w-[90px] text-right leading-tight">${u.xpOverrideReason}</span>` : ''}
+                                    </div>` : ''}
+                                </div>
                                 ${!isMe ? `<button onclick="window.toggleFollow('${u.id}')" data-follow-uid="${u.id}" class="follow-btn ${isFollowingLb ? 'following' : 'follow'} text-[9px] px-2 py-1">
                                     ${isFollowingLb ? '✓' : '+'}
                                 </button>` : ''}
@@ -3148,6 +3163,19 @@
             document.getElementById('dash-level-title').innerText = rank.title;
             document.getElementById('nav-rank-title').innerText = rank.title;
             document.getElementById('dash-xp').innerHTML = `${totalXp} <span class="text-sm opacity-70">XP</span>`;
+            // Show XP adjustment notice for the logged-in user
+            const dashAdjNotice = document.getElementById('dash-xp-adj-notice');
+            const dashAdjBadge = document.getElementById('dash-xp-adj-badge');
+            const dashAdjReason = document.getElementById('dash-xp-adj-reason');
+            const myAdj = myUserDoc.xpOverride || 0;
+            if (dashAdjNotice && myAdj !== 0) {
+                dashAdjBadge.innerText = (myAdj > 0 ? '+' : '') + myAdj + ' XP admin adjustment';
+                dashAdjBadge.className = `text-[10px] font-black px-2 py-0.5 rounded-full ${myAdj > 0 ? 'bg-emerald-400/30 text-emerald-200' : 'bg-rose-400/30 text-rose-200'}`;
+                dashAdjReason.innerText = myUserDoc.xpOverrideReason ? `Reason: ${myUserDoc.xpOverrideReason}` : '';
+                dashAdjNotice.classList.remove('hidden');
+            } else if (dashAdjNotice) {
+                dashAdjNotice.classList.add('hidden');
+            }
 
             // --- Enrollment ID everywhere ---
             const eid = userData.enrollmentId || '';
@@ -4376,16 +4404,27 @@
             document.getElementById('pv-best').innerText = `${bestScore} XP`;
             document.getElementById('pv-global-rank').innerText = lbRank >= 0 ? `#${lbRank + 1}` : '#--';
             // Show XP adjustment badge if admin has set an override
+            // XP adjustment: badge + visible reason block for all users
             const pvAdjEl = document.getElementById('pv-xp-adj-badge');
+            const pvAdjBlock = document.getElementById('pv-xp-adj-block');
+            const pvAdjReasonEl = document.getElementById('pv-xp-adj-reason');
+            const adj = u.xpOverride || 0;
             if (pvAdjEl) {
-                const adj = u.xpOverride || 0;
                 if (adj !== 0) {
                     pvAdjEl.innerText = (adj > 0 ? '+' : '') + adj + ' adj';
-                    pvAdjEl.title = u.xpOverrideReason || 'Admin adjusted';
-                    pvAdjEl.className = `text-[10px] font-black px-2 py-0.5 rounded-full ml-1 cursor-help ${adj > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`;
+                    pvAdjEl.className = `text-[10px] font-black px-2 py-0.5 rounded-full ml-1 ${adj > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`;
                     pvAdjEl.style.display = 'inline';
                 } else {
                     pvAdjEl.style.display = 'none';
+                }
+            }
+            if (pvAdjBlock) {
+                if (adj !== 0 && u.xpOverrideReason) {
+                    pvAdjReasonEl.innerText = u.xpOverrideReason;
+                    pvAdjBlock.className = `mx-4 mb-3 px-4 py-2.5 rounded-xl text-xs font-medium ${adj > 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-200 text-rose-800'}`;
+                    pvAdjBlock.style.display = 'block';
+                } else {
+                    pvAdjBlock.style.display = 'none';
                 }
             }
 
