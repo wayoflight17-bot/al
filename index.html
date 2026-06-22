@@ -308,7 +308,36 @@
             z-index: 10;
         }
 
-        /* ===== WINNER ANNOUNCEMENT POPUP ===== */
+        /* ===== CONTENT LAYOUT: FULL WIDTH, NO SIDE GAPS ===== */
+        /* Override any inner containers that re-introduce horizontal padding */
+        #view-dashboard.app-content-offset,
+        #view-study.app-content-offset,
+        #home-material-grid,
+        #study-content-grid {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        /* ===== INSTAGRAM EMBED: HIDE COMMENT INPUT + SEPARATOR ===== */
+        /* The "Add a comment" input and the <hr> separator below the comment list
+           sit in the bottom ~56 px of the native Instagram embed iframe.
+           We can't reach inside the cross-origin iframe with CSS, so we clip the
+           iframe container instead: give it overflow:hidden and pull the iframe
+           56 px below the container's clipping edge via a negative bottom margin. */
+        .ig-embed-clip {
+            position: relative;
+            overflow: hidden;
+            /* Cut off the bottom ~56 px: comment input bar + separator line */
+            padding-bottom: 0;
+            /* Clip height = iframe natural height minus 56 px of comment UI */
+            max-height: calc(100% - 0px); /* fallback; JS will adjust per-embed */
+        }
+        .ig-embed-frame {
+            display: block;
+            width: 100%;
+            /* Pull the iframe down so its bottom content is hidden by the container clip */
+            margin-bottom: -56px;
+        }
         #winner-popup-overlay {
             position: fixed; inset: 0; z-index: 200;
             background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
@@ -428,7 +457,7 @@
     <!-- Hidden element for JS enrollment ID sync (displayed in dashboard) -->
     <span id="nav-enrollment-id" class="hidden"></span>
 
-    <main class="max-w-7xl mx-auto px-4 py-8">
+    <main class="w-full py-8">
         
         <!-- AUTH VIEW -->
         <div id="view-auth" class="hidden-view max-w-md mx-auto mt-12 fade-in">
@@ -5185,13 +5214,13 @@
                 const label = isGeneralGroup ? 'General' : key;
                 const colors = sectionColors[i % sectionColors.length];
                 return `
-                <div class="mb-7">
+                <div class="mb-0">
                     <div class="flex items-center gap-2.5 mb-4 ${colors.bg} border ${colors.border} rounded-2xl px-4 py-3">
                         <span class="w-2 h-2 rounded-full ${colors.dot} flex-shrink-0"></span>
                         <span class="font-black ${colors.text} text-sm flex-1 min-w-0 truncate">${label}</span>
                         <span class="text-[10px] font-black ${colors.text} bg-white/70 px-2 py-1 rounded-full flex-shrink-0">${groupItems.length} ${groupItems.length === 1 ? 'item' : 'items'}</span>
                     </div>
-                    <div class="space-y-4">
+                    <div class="space-y-0">
                         ${groupItems.map(item => item.type === 'youtube' ? renderYouTubeCard(item) : renderInstagramCard(item)).join('')}
                     </div>
                 </div>`;
@@ -5415,7 +5444,7 @@
             const vid = item.youtubeId || extractYTId(item.originalUrl || '');
             const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '';
             return `
-            <div class="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow" id="sc-card-${item.id}">
+            <div class="bg-white rounded-none overflow-hidden shadow-none border-0 border-b border-slate-100" id="sc-card-${item.id}">
                 <div class="flex items-start gap-3 p-4 pb-3">
                     <div class="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
                         <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -5443,14 +5472,14 @@
             const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '';
 
             const slides = posts.map((p, i) => `
-                <div class="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100${i > 0 ? ' mt-3' : ''}">
+                <div class="ig-embed-clip${i > 0 ? ' border-t border-slate-100' : ''}">
                     <iframe src="https://www.instagram.com/p/${p.shortcode}/embed/"
                         scrolling="no" frameborder="0" allowtransparency="true" loading="lazy"
-                        title="${item.title} — part ${i+1} of ${posts.length}" class="w-full" style="min-height:480px;"></iframe>
+                        title="${item.title} — part ${i+1} of ${posts.length}" class="w-full ig-embed-frame" style="min-height:480px;"></iframe>
                 </div>`).join('');
 
             return `
-            <div class="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow" id="sc-card-${item.id}">
+            <div class="bg-white rounded-none overflow-hidden shadow-none border-0 border-b border-slate-100" id="sc-card-${item.id}">
                 <!-- Header -->
                 <div class="flex items-start gap-3 p-4 pb-3">
                     <div class="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
@@ -5466,7 +5495,7 @@
                 </div>
 
                 <!-- All posts, stacked one after another — no carousel -->
-                <div class="px-4 pb-4">
+                <div class="p-0">
                     ${slides}
                 </div>
             </div>`;
@@ -5474,6 +5503,16 @@
 
         const initInstagramEmbeds = () => {
             if (window.instgrm?.Embeds) window.instgrm.Embeds.process();
+            // After embeds process, set each clip container height = iframe height - 56px
+            // so the "Add a comment" bar and separator are hidden by overflow:hidden
+            setTimeout(() => {
+                document.querySelectorAll('.ig-embed-clip').forEach(clip => {
+                    const iframe = clip.querySelector('.ig-embed-frame');
+                    if (iframe && iframe.offsetHeight > 100) {
+                        clip.style.height = (iframe.offsetHeight - 56) + 'px';
+                    }
+                });
+            }, 2000);
         };
 
         // ===== FILL IN THE BLANKS — drag-and-drop (mouse + touch) WITH tap-to-select fallback =====
